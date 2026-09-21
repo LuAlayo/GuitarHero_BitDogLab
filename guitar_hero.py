@@ -42,7 +42,7 @@ recorde = 0
 # ============================================================
 def desenhar_tela_inicial():
     oled.fill(0)
-    oled.text("GUITAR HERO", 20, 8)
+    oled.text("GUITAR DOG", 20, 8)
     oled.hline(16, 20, 96, 1)
     oled.text("Pressione:", 28, 30)
     oled.text("[A] [B] ou [C]", 12, 42)
@@ -51,7 +51,7 @@ def desenhar_tela_inicial():
     
 def desenhar_tela_load():
     oled.fill(0)
-    oled.text("GUITAR HERO", 20, 8)
+    oled.text("GUITAR DOG", 20, 8)
     oled.hline(16, 20, 96, 1)
     oled.text("Preparando jogo", 7, 30)
     oled.text("Aguarde", 35, 42)
