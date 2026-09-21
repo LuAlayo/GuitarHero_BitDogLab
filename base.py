@@ -33,6 +33,10 @@ ESTADO_EM_DESENVOLVIMENTO = 3
 
 estado_atual = ESTADO_TELA_INICIAL
 
+# Pontuação da partida atual, e o recorde salvo em arquivo (ver seção 6)
+pontuacao = 0
+recorde = 0
+
 # ============================================================
 # 3. FUNÇÕES GRÁFICAS AUXILIARES PARA FUNCIONAMENTO DA TELA
 # ============================================================
@@ -58,14 +62,10 @@ def desenhar_base_guitarra():
     # Função para desenhar a Tela de Jogo de acordo com o escopo estabelecido
     oled.fill(0)
     
-    # Limites da guitarra
-    oled.text("_____________", 7, 2)
-    oled.text("_____________", 7, 52)
-    
     # Cordas e alvos '0' com indicador do botão correspondente
-    oled.text("------------0 A", 7, 10)
-    oled.text("------------0 B", 7, 30)
-    oled.text("------------0 C", 7, 50)
+    oled.text("------------O A", 7, 10)
+    oled.text("------------O B", 7, 30)
+    oled.text("------------O C", 7, 50)
     
     # Separadores de fret (barras verticais)
     for y_fret in (10, 15, 20, 25, 30, 35, 40, 45, 50):
@@ -81,6 +81,17 @@ def desenhar_tela_desenvolvimento():
     oled.text("BitDogLab V7", 16, 46)
     oled.show()
 
+def desenhar_tela_pontuacao(pontos, recorde_atual, bateu_recorde):
+    # Tela simples de resultado, mostrada ao final das rodadas
+    oled.fill(0)
+    oled.text("FIM DE JOGO", 20, 6)
+    oled.hline(16, 18, 96, 1)
+    oled.text("Pontos: " + str(pontos), 16, 28)
+    oled.text("Recorde: " + str(recorde_atual), 12, 40)
+    if bateu_recorde:
+        oled.text("NOVO RECORDE!", 8, 52)
+    oled.show()
+
 
 # ============================================================
 # 4. FUNÇÕES AUXILIARES DE JOGABILIDADE
@@ -89,24 +100,76 @@ def verificar_botoes(): # Função para checar se qualquer botão foi pressionad
     return (btn_a.value() == 0) or (btn_b.value() == 0) or (btn_c.value() == 0)
 
 
-
+# ------------------------------------------------------------
 # Função auxiliar que faz o jogo funcionar comandando o surgimento de notas na tela com atraso definido
 # para iniciar rodada, e executa a animação das notas se movendo ao longo da corda com o passar do tempo.
 # ta, tb, tc: tempo em ticks (de 350 ms) em que cada nota é disparada
+# ------------------------------------------------------------
 def rodada_jogo(ta, tb, tc):
+    global pontuacao
+
     INTERVALO_TICK_MS = 350
-    
+
+    # Janela de acerto: a nota conta como acertada se o botão for pressionado
+    # enquanto ela estiver nessas posições (11 = uma casa antes do alvo,
+    # 12 = exatamente sobre o "0"). Ignoramos multiplicador por enquanto,
+    # como combinado -- cada acerto vale sempre 10 pontos.
+    JANELA_ACERTO = (11, 12)
+    PONTOS_POR_ACERTO = 10
+
     # Posição atual de cada nota na pista (-1 = ainda não lançada, 0 a 12 = na tela, 13 = finalizada)
     pos_a = -1
     pos_b = -1
     pos_c = -1
-    
+
+    # Marca se a nota já foi "julgada" (acertada OU perdida) nesta rodada,
+    # para não contar o mesmo acerto duas vezes nem aceitar cliques tardios
+    # depois que a nota já passou da janela.
+    julgada_a = False
+    julgada_b = False
+    julgada_c = False
+
+    # Estado anterior dos botões, para detectar a BORDA de descida (o
+    # instante exato em que o botão passa de solto para pressionado) em vez
+    # de contar repetidamente enquanto ele fica segurado.
+    anterior_a = btn_a.value()
+    anterior_b = btn_b.value()
+    anterior_c = btn_c.value()
+
     temp_notas = 0 # Variável auxiliar para identificar hora exata de lançar cada nota, conta ticks 
     proximo_tick = utime.ticks_ms() 
     
     while True:
         agora = utime.ticks_ms()
-        
+
+        # ------------------------------------------------------------
+        # Captura dos botões: verificada em TODA volta do laço (não só a
+        # cada 350ms), para não perder o instante exato do clique. Como
+        # cada acerto já fica "travado" por julgada_x=True, mesmo que o
+        # botão dê um pequeno ruído mecânico (bounce) só a primeira
+        # detecção conta -- não é preciso um debounce por tempo aqui.
+        # ------------------------------------------------------------
+        atual_a = btn_a.value()
+        if atual_a == 0 and anterior_a == 1:  # borda de descida = clique novo
+            if (not julgada_a) and (pos_a in JANELA_ACERTO):
+                pontuacao += PONTOS_POR_ACERTO
+                julgada_a = True
+        anterior_a = atual_a
+
+        atual_b = btn_b.value()
+        if atual_b == 0 and anterior_b == 1:
+            if (not julgada_b) and (pos_b in JANELA_ACERTO):
+                pontuacao += PONTOS_POR_ACERTO
+                julgada_b = True
+        anterior_b = atual_b
+
+        atual_c = btn_c.value()
+        if atual_c == 0 and anterior_c == 1:
+            if (not julgada_c) and (pos_c in JANELA_ACERTO):
+                pontuacao += PONTOS_POR_ACERTO
+                julgada_c = True
+        anterior_c = atual_c
+
         # Só atualiza nota na tela quando passam 350 ms
         if utime.ticks_diff(agora, proximo_tick) >= 0:
             proximo_tick = utime.ticks_add(proximo_tick, INTERVALO_TICK_MS)
@@ -114,10 +177,16 @@ def rodada_jogo(ta, tb, tc):
             # Verifica se é o momento correto de lançar cada nota
             if temp_notas >= ta and pos_a < 13:
                 pos_a += 1
+                if pos_a > max(JANELA_ACERTO) and not julgada_a:
+                    julgada_a = True  # nota passou da janela sem ser tocada: perdida
             if temp_notas >= tb and pos_b < 13:
                 pos_b += 1
+                if pos_b > max(JANELA_ACERTO) and not julgada_b:
+                    julgada_b = True
             if temp_notas >= tc and pos_c < 13:
                 pos_c += 1
+                if pos_c > max(JANELA_ACERTO) and not julgada_c:
+                    julgada_c = True
                 
             # Redesenha desenho padrão da guitarra
             desenhar_base_guitarra()
@@ -138,6 +207,11 @@ def rodada_jogo(ta, tb, tc):
                 oled.fill_rect(x_c, 50, 8, 8, 0)
                 oled.text("X", x_c, 50)
             
+            # Mostra a pontuação corrente no canto, sobrepondo o limite
+            # superior da guitarra sem atrapalhar a leitura das cordas
+            oled.fill_rect(90, 2, 38, 8, 0)
+            oled.text(str(pontuacao), 90, 2)
+
             # Atualiza representação no display
             oled.show()
             
@@ -147,9 +221,31 @@ def rodada_jogo(ta, tb, tc):
             if pos_a >= 13 and pos_b >= 13 and pos_c >= 13:
                 break
 
+
 # ============================================================
-# 5. LOOP PRINCIPAL DE CONTROLE
+# 5. PERSISTÊNCIA DO RECORDE EM ARQUIVO
 # ============================================================
+# A BitDogLab (RP2040) tem um sistema de arquivos próprio na flash interna,
+# acessível pelas funções normais de arquivo do MicroPython. Gravamos o
+# recorde em um arquivo texto simples, que continua lá mesmo depois de
+# desligar a placa ou regravar o programa (a flash é não-volátil).
+def carregar_recorde():
+    try:
+        with open("recorde.txt", "r") as arquivo:
+            return int(arquivo.read())
+    except (OSError, ValueError):
+        # Arquivo ainda não existe (primeira execução) ou conteúdo inválido
+        return 0
+
+def salvar_recorde(valor):
+    with open("recorde.txt", "w") as arquivo:
+        arquivo.write(str(valor))
+
+
+# ============================================================
+# 6. LOOP PRINCIPAL DE CONTROLE
+# ============================================================
+recorde = carregar_recorde()
 desenhar_tela_inicial()
 
 while True:
@@ -157,6 +253,7 @@ while True:
         if verificar_botoes():
             utime.sleep_ms(50) # Espera ativa para evitar debounce
             if verificar_botoes():
+                pontuacao = 0  # zera a pontuação de uma eventual partida anterior
                 estado_atual = ESTADO_LOADING # Mudança de estado
                 desenhar_tela_load()
                 while verificar_botoes():
@@ -177,8 +274,17 @@ while True:
         rodada_jogo(15, 0, 0)
         rodada_jogo(0, 8, 25)
         
-        # Ao término das notas, segue para a tela de desenvolvimento
-        estado_atual = ESTADO_EM_DESENVOLVIMENTO # Mudança de estado 
+        # Ao término das notas, verifica e atualiza o recorde, mostra o
+        # resultado, e então segue para a tela de desenvolvimento
+        bateu_recorde = pontuacao > recorde
+        if bateu_recorde:
+            recorde = pontuacao
+            salvar_recorde(recorde)
+
+        desenhar_tela_pontuacao(pontuacao, recorde, bateu_recorde)
+        utime.sleep_ms(3000)  # tempo de leitura da tela de resultado
+
+        estado_atual = ESTADO_EM_DESENVOLVIMENTO # Mudança de estado
         desenhar_tela_desenvolvimento()
 
     elif estado_atual == ESTADO_EM_DESENVOLVIMENTO:

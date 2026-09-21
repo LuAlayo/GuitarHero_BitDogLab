@@ -62,10 +62,6 @@ def desenhar_base_guitarra():
     # Função para desenhar a Tela de Jogo de acordo com o escopo estabelecido
     oled.fill(0)
     
-    # Limites da guitarra
-    #oled.text("_____________", 7, 2)
-    #oled.text("_____________", 7, 52)
-    
     # Cordas e alvos '0' com indicador do botão correspondente
     oled.text("------------O A", 7, 10)
     oled.text("------------O B", 7, 30)

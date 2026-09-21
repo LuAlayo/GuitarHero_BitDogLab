@@ -1,0 +1,75 @@
+<xml xmlns="https://bipes.net.br">
+  <workspace>
+    <field name="DEVICE">v7</field>
+    <field name="TIMESTAMP">1788808595497</field>
+  </workspace>
+  <block type="display_texto" id="3)w:XN41-q!,N$x*h-g@" x="413" y="188">
+    <field name="TEXTO">------x-----0 A</field>
+    <field name="LINHA">1</field>
+    <field name="ALINHAMENTO">LEFT</field>
+    <field name="DISPLAY_TYPE">SMALL</field>
+  </block>
+  <block type="display_texto" id="Qx~87I^#M}EZ_QzJqHeW" x="488" y="288">
+    <field name="TEXTO">x-----------0 B</field>
+    <field name="LINHA">3</field>
+    <field name="ALINHAMENTO">LEFT</field>
+    <field name="DISPLAY_TYPE">SMALL</field>
+  </block>
+  <block type="display_texto" id="xJhjw/Fse0gjLXv]5=2o" x="987" y="338">
+    <field name="TEXTO"> |   |   | </field>
+    <field name="LINHA">2</field>
+    <field name="ALINHAMENTO">LEFT</field>
+    <field name="DISPLAY_TYPE">SMALL</field>
+  </block>
+  <block type="display_texto" id="F{dZQI*zlsLbaN/SwHGY" x="487" y="388">
+    <field name="TEXTO">------------0 C</field>
+    <field name="LINHA">5</field>
+    <field name="ALINHAMENTO">LEFT</field>
+    <field name="DISPLAY_TYPE">SMALL</field>
+  </block>
+  <block type="display_texto" id="__fxhi~j`J+]5Odj_,8v" x="913" y="438">
+    <field name="TEXTO"> |   |   |</field>
+    <field name="LINHA">4</field>
+    <field name="ALINHAMENTO">LEFT</field>
+    <field name="DISPLAY_TYPE">SMALL</field>
+  </block>
+  <block type="botao_se_apertado" id="zQ_K,`%rU(!WF|c!?f%6" x="263" y="563">
+    <field name="BOTAO">A</field>
+    <statement name="DO">
+      <block type="tocar_nota" id="-#+qo//SgdEw*ziR#)eT">
+        <field name="OCTAVE">4</field>
+        <field name="VOLUME">50</field>
+        <field name="DURATION">250</field>
+        <value name="NOTA">
+          <block type="nota_la" id="PlK`|pgowRp;0zH/:UP3"></block>
+        </value>
+      </block>
+    </statement>
+  </block>
+  <block type="botao_se_apertado" id="#~N2N:iZILZwJassHJBA" x="863" y="538">
+    <field name="BOTAO">B</field>
+    <statement name="DO">
+      <block type="tocar_nota" id="El-(s?uw9){=;+(-z#sz">
+        <field name="OCTAVE">4</field>
+        <field name="VOLUME">50</field>
+        <field name="DURATION">250</field>
+        <value name="NOTA">
+          <block type="nota_re" id=",D_n9AH^9$x}DxJ22nbe"></block>
+        </value>
+      </block>
+    </statement>
+  </block>
+  <block type="botao_se_apertado" id="V/NhV=KaXR7/^7eTXe^*" x="318" y="674">
+    <field name="BOTAO">C</field>
+    <statement name="DO">
+      <block type="tocar_nota" id="9-ug;(~D`HJP5crKRA+N">
+        <field name="OCTAVE">4</field>
+        <field name="VOLUME">50</field>
+        <field name="DURATION">250</field>
+        <value name="NOTA">
+          <block type="nota_mi" id="jj~9%ALX|_O5$R,y=FDa"></block>
+        </value>
+      </block>
+    </statement>
+  </block>
+</xml>
