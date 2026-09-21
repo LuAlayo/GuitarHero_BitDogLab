@@ -29,7 +29,7 @@ btn_c = Pin(10, Pin.IN, Pin.PULL_UP)
 ESTADO_TELA_INICIAL = 0
 ESTADO_LOADING = 1
 ESTADO_JOGO = 2
-ESTADO_EM_DESENVOLVIMENTO = 3
+ESTADO_PONTUACAO = 3
 
 estado_atual = ESTADO_TELA_INICIAL
 
@@ -280,12 +280,10 @@ while True:
         if bateu_recorde:
             recorde = pontuacao
             salvar_recorde(recorde)
+        estado_atual = ESTADO_PONTUACAO # Mudança de estado
 
+    elif estado_atual == ESTADO_PONTUACAO:
         desenhar_tela_pontuacao(pontuacao, recorde, bateu_recorde)
         utime.sleep_ms(3000)  # tempo de leitura da tela de resultado
-
-        estado_atual = ESTADO_EM_DESENVOLVIMENTO # Mudança de estado
-        desenhar_tela_desenvolvimento()
-
-    elif estado_atual == ESTADO_EM_DESENVOLVIMENTO:
-        utime.sleep_ms(100)
+        desenhar_tela_inicial()
+        estado_atual = ESTADO_TELA_INICIAL # Mudança de estado
