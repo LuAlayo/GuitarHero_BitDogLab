@@ -44,7 +44,7 @@
 // REGISTRADORES DO TIMER DO RP2040 (BAIXO NÍVEL)
 // ============================================================
 #define GAME_ALARM_NUM      0
-#define GAME_ALARM_IRQ      TIMER_IRQ_0
+#define GAME_ALARM_IRQ      TIMER0_IRQ_0
 
 static volatile uint32_t periodo_tick_us = 300000;
 static volatile bool tick_flag = false;

@@ -1,5 +1,5 @@
 // ===============================================================
-// PROJETO 1 - EA801 - Laboratório Projeto de Sistemas Embarcados
+// PROJETO 2 - EA801 - Laboratório Projeto de Sistemas Embarcados
 // Luíza Maria Cabel Alayo, RA: 243537
 // Rafael Mattos Sacramento, RA: 247349
 // ===============================================================
@@ -8,6 +8,7 @@
 #include "pico/stdlib.h"
 #include "hardware_v7.h"
 #include "sh1107.h"
+#include "recorde_flash.h"
 
 // Estados da Máquina de Estados Finitos (MEF)
 #define ESTADO_TELA_INICIAL   0
@@ -18,6 +19,7 @@
 volatile int estado_mef = ESTADO_TELA_INICIAL;
 int pontuacao = 0;
 int recorde = 0;
+bool novo_recorde = false;
 
 // Posições X das 4 cordas verticais na tela de 128x128
 const int corda_x[4] = {20, 48, 76, 104};
@@ -94,7 +96,7 @@ void desenhar_tela_pontuacao(void) {
     sprintf(buffer, "RECORDE: %d", recorde);
     sh1107_draw_string(20, 68, buffer, 1);
 
-    if (pontuacao >= recorde && pontuacao > 0) {
+    if (novo_recorde) {
         sh1107_draw_string(14, 90, "NOVO RECORDE!", 1);
     }
     sh1107_show();
@@ -169,6 +171,7 @@ void executar_rodada(int t1, int t2, int t3, int t4) {
 void configuracao(void) {
     bitdoglab_init_hardware();
     sh1107_init();
+    recorde = recorde_carregar();   // recupera o recorde salvo na flash
 }
 
 int main(void) {
@@ -191,6 +194,7 @@ int main(void) {
                 }
 
                 pontuacao = 0;
+                novo_recorde = false;
                 estado_mef = ESTADO_TELA_LOAD;
                 break;
 
@@ -209,6 +213,8 @@ int main(void) {
 
                 if (pontuacao > recorde) {
                     recorde = pontuacao;
+                    novo_recorde = true;
+                    recorde_salvar(recorde);   // grava na flash (timer já parado)
                 }
                 estado_mef = ESTADO_TELA_PONTUACAO;
                 break;
