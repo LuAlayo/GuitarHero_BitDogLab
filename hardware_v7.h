@@ -1,5 +1,5 @@
 // ===============================================================
-// PROJETO 1 - EA801 - Laboratório Projeto de Sistemas Embarcados
+// PROJETO 2 - EA801 - Laboratório Projeto de Sistemas Embarcados
 // Luíza Maria Cabel Alayo, RA: 243537
 // Rafael Mattos Sacramento, RA: 247349
 // ===============================================================
@@ -11,6 +11,8 @@
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 #include "hardware/irq.h"
+#include "hardware/pwm.h"
+#include "hardware/clocks.h"
 #include "hardware/structs/timer.h"
 
 // ============================================================
@@ -41,12 +43,22 @@
 #define LED_RGB_B           12
 
 // ============================================================
+// NOTAS MUSICAIS (Frequências em Hz - 4ª Oitava)
+// ============================================================
+#define NOTA_DO4            262
+#define NOTA_RE4            294
+#define NOTA_MI4            330
+#define NOTA_FA4            349
+#define NOTA_SOL4           392
+#define NOTA_LA4            440
+
+// ============================================================
 // REGISTRADORES DO TIMER DO RP2040 (BAIXO NÍVEL)
 // ============================================================
 #define GAME_ALARM_NUM      0
 #define GAME_ALARM_IRQ      TIMER0_IRQ_0
 
-static volatile uint32_t periodo_tick_us = 300000;
+static volatile uint32_t periodo_tick_us = 125000;
 static volatile bool tick_flag = false;
 
 static void isr_timer_baixo_nivel(void) {
@@ -66,6 +78,37 @@ static inline void timer_baixo_nivel_init(uint32_t periodo_us) {
 static inline void timer_baixo_nivel_stop(void) {
     timer_hw->inte &= ~(1u << GAME_ALARM_NUM);
     irq_set_enabled(GAME_ALARM_IRQ, false);
+}
+
+// ============================================================
+// MOTOR DE ÁUDIO PWM (BUZZER PASSIVO - GPIO21)
+// ============================================================
+static inline void buzzer_init_pwm(void) {
+    gpio_set_function(BUZZER_PIN, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(BUZZER_PIN);
+    pwm_set_enabled(slice_num, false);
+}
+
+static inline void buzzer_tocar_nota(uint32_t freq_hz) {
+    uint slice_num = pwm_gpio_to_slice_num(BUZZER_PIN);
+    if (freq_hz == 0) {
+        pwm_set_enabled(slice_num, false);
+        return;
+    }
+    // Clock padrão do RP2040 = 125 MHz. Divisor 125.0f -> 1 MHz (1 us por contagem)
+    uint32_t clock_sys = clock_get_hz(clk_sys);
+    float clkdiv = (float)clock_sys / 1000000.0f;
+    uint32_t wrap = (1000000u / freq_hz) - 1u;
+
+    pwm_set_clkdiv(slice_num, clkdiv);
+    pwm_set_wrap(slice_num, wrap);
+    pwm_set_chan_level(slice_num, pwm_gpio_to_channel(BUZZER_PIN), wrap / 2); // 50% duty cycle
+    pwm_set_enabled(slice_num, true);
+}
+
+static inline void buzzer_parar(void) {
+    uint slice_num = pwm_gpio_to_slice_num(BUZZER_PIN);
+    pwm_set_enabled(slice_num, false);
 }
 
 // ============================================================
@@ -97,11 +140,11 @@ static inline void bitdoglab_init_hardware(void) {
     gpio_pull_up(OLED_SDA_PIN);
     gpio_pull_up(OLED_SCL_PIN);
 
-    // 4. LEDs e Buzzer
+    // 4. LEDs e Buzzer PWM
     gpio_init(LED_RGB_R); gpio_set_dir(LED_RGB_R, GPIO_OUT); gpio_put(LED_RGB_R, 0);
     gpio_init(LED_RGB_G); gpio_set_dir(LED_RGB_G, GPIO_OUT); gpio_put(LED_RGB_G, 0);
     gpio_init(LED_RGB_B); gpio_set_dir(LED_RGB_B, GPIO_OUT); gpio_put(LED_RGB_B, 0);
-    gpio_init(BUZZER_PIN); gpio_set_dir(BUZZER_PIN, GPIO_OUT); gpio_put(BUZZER_PIN, 0);
+    buzzer_init_pwm();
 }
 
 // Leitura individual das 4 vias touch (Ativo em HIGH)

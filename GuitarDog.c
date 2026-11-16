@@ -26,9 +26,44 @@ const int corda_x[4] = {20, 48, 76, 104};
 const uint touch_pins[4] = {TOUCH_CH1_PIN, TOUCH_CH2_PIN, TOUCH_CH3_PIN, TOUCH_CH4_PIN};
 
 #define Y_ALVO             112 // Posição vertical dos alvos
-#define JANELA_MIN         104 // Início da janela de acerto
-#define JANELA_MAX         120 // Fim da janela de acerto
-#define PASSO_QUEDA        8   // Distância que a nota cai a cada tick
+#define JANELA_MIN         96  // Início da janela de acerto (tolerância de +-2 ticks)
+#define JANELA_MAX         124 // Fim da janela de acerto
+#define PASSO_QUEDA        8   // Distância que a nota cai a cada tick (125 ms)
+
+// ============================================================
+// ESTRUTURA E PARTITURA: "BRILHA BRILHA ESTRELINHA"
+// ============================================================
+typedef struct {
+    uint8_t corda;         // 0 a 3 (Canal Touch 1 a 4)
+    uint16_t freq;         // Frequência da nota em Hz
+    uint16_t tick_disparo; // Tick em que a nota nasce no topo (y = 0)
+    uint8_t duracao_ticks; // Quantos ticks o buzzer fica soando ao acertar
+} NotaMusical;
+
+// Cada tick = 125 ms.
+// Semínima = 4 ticks (500 ms) de intervalo, 3 ticks (375 ms) de som ligado.
+// Mínima   = 8 ticks (1000 ms) de intervalo, 6 ticks (750 ms) de som ligado.
+const NotaMusical partitura_estrelinha[] = {
+    // "Bri - lha, bri - lha, es - tre - li - nha" (Dó Dó Sol Sol Lá Lá Sol)
+    {0, NOTA_DO4,   0, 3}, // Bri-
+    {0, NOTA_DO4,   4, 3}, // -lha,
+    {2, NOTA_SOL4,  8, 3}, // bri-
+    {2, NOTA_SOL4, 12, 3}, // -lha,
+    {3, NOTA_LA4,  16, 3}, // es-
+    {3, NOTA_LA4,  20, 3}, // -tre-
+    {2, NOTA_SOL4, 24, 6}, // -li-nha (nota longa)
+
+    // "Que - ro ver vo - cê bri - lhar" (Fá Fá Mi Mi Ré Ré Dó)
+    {2, NOTA_FA4,  32, 3}, // Que-
+    {2, NOTA_FA4,  36, 3}, // -ro
+    {1, NOTA_MI4,  40, 3}, // ver
+    {1, NOTA_MI4,  44, 3}, // vo-
+    {1, NOTA_RE4,  48, 3}, // -cê
+    {1, NOTA_RE4,  52, 3}, // bri-
+    {0, NOTA_DO4,  56, 6}  // -lhar (nota longa)
+};
+
+#define TOTAL_NOTAS (sizeof(partitura_estrelinha) / sizeof(partitura_estrelinha[0]))
 
 // ============================================================
 // TELAS DO JOGO
@@ -37,11 +72,11 @@ void desenhar_tela_inicial(void) {
     sh1107_clear();
     sh1107_draw_string(28, 14, "GUITAR DOG", 1);
     sh1107_draw_hline(20, 108, 26, 1);
-    
-    // Instrução atualizada para contemplar botões e touch
-    sh1107_draw_string(28, 48, "APERTE BOTAO", 1);
-    sh1107_draw_string(22, 62, "A, B, C OU TOUCH", 1);
-    sh1107_draw_string(26, 84, "PARA INICIAR", 1);
+
+    sh1107_draw_string(16, 40, "MUSICA: ESTRELINHA", 1);
+    sh1107_draw_string(28, 62, "APERTE BOTAO", 1);
+    sh1107_draw_string(22, 76, "A, B, C OU TOUCH", 1);
+    sh1107_draw_string(26, 96, "PARA INICIAR", 1);
     sh1107_show();
 }
 
@@ -50,7 +85,7 @@ void desenhar_tela_load(int segundos) {
     sh1107_draw_string(28, 20, "GUITAR DOG", 1);
     sh1107_draw_hline(20, 108, 32, 1);
     sh1107_draw_string(14, 56, "PREPARANDO JOGO", 1);
-    
+
     char digito[2] = {'0' + segundos, '\0'};
     sh1107_draw_string(60, 80, digito, 1);
     sh1107_show();
@@ -103,65 +138,126 @@ void desenhar_tela_pontuacao(void) {
 }
 
 // ============================================================
-// MOTOR DE UMA RODADA DO JOGO
+// MOTOR DA PARTITURA ("BRILHA BRILHA ESTRELINHA")
 // ============================================================
-void executar_rodada(int t1, int t2, int t3, int t4) {
-    int pos_y[4] = {-1, -1, -1, -1};
-    bool julgada[4] = {false, false, false, false};
-    bool toque_anterior[4] = {false, false, false, false};
-    int disparos[4] = {t1, t2, t3, t4};
+// Obs.: Se você quiser que a música toque sozinha (modo demonstração/base)
+// mesmo sem acertar o touch, mude TOCAR_SOMENTE_NO_ACERTO para 0.
+#define TOCAR_SOMENTE_NO_ACERTO 1
 
+void executar_musica(void) {
+    int pos_y[TOTAL_NOTAS];
+    bool julgada[TOTAL_NOTAS];
+    bool acertada[TOTAL_NOTAS];
+
+    for (size_t n = 0; n < TOTAL_NOTAS; n++) {
+        pos_y[n] = -1;
+        julgada[n] = false;
+        acertada[n] = false;
+    }
+
+    bool toque_anterior[4] = {false, false, false, false};
+    int ticks_buzzer_restantes = 0;
     int ticks_decorridos = 0;
+
     tick_flag = false;
-    timer_baixo_nivel_init(250000); // 250 ms por tick
+    timer_baixo_nivel_init(125000); // 125 ms por tick (Semínima = 500 ms)
 
     while (true) {
-        // Leitura contínua dos canais touch
-        for (int i = 0; i < 4; i++) {
-            bool toque_atual = touch_read(touch_pins[i]);
-            if (toque_atual && !toque_anterior[i]) {
-                if (!julgada[i] && pos_y[i] >= JANELA_MIN && pos_y[i] <= JANELA_MAX) {
-                    pontuacao += 10;
-                    julgada[i] = true;
-                    gpio_put(LED_RGB_G, 1);
-                }
-            }
-            toque_anterior[i] = toque_atual;
-        }
+        // 1. Leitura em tempo real dos 4 canais Touch (borda de subida)
+        for (int c = 0; c < 4; c++) {
+            bool toque_atual = touch_read(touch_pins[c]);
+            if (toque_atual && !toque_anterior[c]) {
+                // Procura a nota não julgada mais próxima do alvo nesta corda
+                for (size_t n = 0; n < TOTAL_NOTAS; n++) {
+                    if (partitura_estrelinha[n].corda == c && !julgada[n]) {
+                        if (pos_y[n] >= JANELA_MIN && pos_y[n] <= JANELA_MAX) {
+                            pontuacao += 10;
+                            julgada[n] = true;
+                            acertada[n] = true;
 
-        // Avanço sincronizado via Timer de Hardware RP2040
-        if (tick_flag) {
-            tick_flag = false;
-            gpio_put(LED_RGB_G, 0);
+                            // Toca a nota correspondente da melodia no Buzzer!
+                            buzzer_tocar_nota(partitura_estrelinha[n].freq);
+                            ticks_buzzer_restantes = partitura_estrelinha[n].duracao_ticks;
 
-            for (int i = 0; i < 4; i++) {
-                if (ticks_decorridos >= disparos[i] && pos_y[i] < 128) {
-                    if (pos_y[i] == -1) pos_y[i] = 0;
-                    else pos_y[i] += PASSO_QUEDA;
-
-                    if (pos_y[i] > JANELA_MAX && !julgada[i]) {
-                        julgada[i] = true;
+                            gpio_put(LED_RGB_G, 1);
+                            gpio_put(LED_RGB_R, 0);
+                            break;
+                        }
                     }
                 }
             }
+            toque_anterior[c] = toque_atual;
+        }
 
+        // 2. Avanço sincronizado via Timer de Hardware RP2040 (a cada 125 ms)
+        if (tick_flag) {
+            tick_flag = false;
+
+            // Controle de tempo do som da nota no Buzzer
+            if (ticks_buzzer_restantes > 0) {
+                ticks_buzzer_restantes--;
+                if (ticks_buzzer_restantes == 0) {
+                    buzzer_parar();
+                    gpio_put(LED_RGB_G, 0);
+                }
+            } else {
+                gpio_put(LED_RGB_G, 0);
+            }
+            gpio_put(LED_RGB_R, 0);
+
+            bool todas_finalizadas = true;
+
+            for (size_t n = 0; n < TOTAL_NOTAS; n++) {
+                if (ticks_decorridos >= partitura_estrelinha[n].tick_disparo) {
+                    if (pos_y[n] < 128) {
+                        if (pos_y[n] == -1) pos_y[n] = 0;
+                        else pos_y[n] += PASSO_QUEDA;
+
+                        #if !TOCAR_SOMENTE_NO_ACERTO
+                        // Modo guia: toca a nota exatamente quando ela passa pelo Y_ALVO
+                        if (pos_y[n] == Y_ALVO) {
+                            buzzer_tocar_nota(partitura_estrelinha[n].freq);
+                            ticks_buzzer_restantes = partitura_estrelinha[n].duracao_ticks;
+                        }
+                        #endif
+
+                        // Nota passou da janela sem ser tocada -> Erro
+                        if (pos_y[n] > JANELA_MAX && !julgada[n]) {
+                            julgada[n] = true;
+                            gpio_put(LED_RGB_R, 1); // Pisca LED vermelho ao perder nota
+                        }
+                    }
+                }
+
+                if (pos_y[n] < 128) {
+                    todas_finalizadas = false;
+                }
+            }
+
+            // Renderização gráfica no OLED SH1107 128x128
             desenhar_base_guitarra();
 
-            for (int i = 0; i < 4; i++) {
-                if (pos_y[i] >= 0 && pos_y[i] <= 124) {
-                    sh1107_draw_char(corda_x[i] - 2, pos_y[i], 'X', 1);
+            for (size_t n = 0; n < TOTAL_NOTAS; n++) {
+                // Desenha apenas as notas que estão na tela e ainda não foram acertadas
+                if (pos_y[n] >= 0 && pos_y[n] <= 124 && !acertada[n]) {
+                    uint8_t c = partitura_estrelinha[n].corda;
+                    sh1107_draw_char(corda_x[c] - 2, pos_y[n], 'X', 1);
                 }
             }
 
             sh1107_show();
             ticks_decorridos++;
 
-            if (pos_y[0] >= 128 && pos_y[1] >= 128 && pos_y[2] >= 128 && pos_y[3] >= 128) {
+            // Aguarda a última nota sair da tela e o último som terminar
+            if (todas_finalizadas && ticks_buzzer_restantes == 0) {
                 break;
             }
         }
     }
 
+    buzzer_parar();
+    gpio_put(LED_RGB_R, 0);
+    gpio_put(LED_RGB_G, 0);
     timer_baixo_nivel_stop();
 }
 
@@ -182,12 +278,10 @@ int main(void) {
             case ESTADO_TELA_INICIAL:
                 desenhar_tela_inicial();
 
-                // Aguarda o acionamento de qualquer botão da BitDogLab (A, B, C) OU canal Touch
                 while (!entrada_inicio_pressionada()) {
                     tight_loop_contents();
                 }
 
-                // Debounce e espera de liberação do botão/touch para evitar avanço duplo
                 sleep_ms(50);
                 while (entrada_inicio_pressionada()) {
                     tight_loop_contents();
@@ -201,15 +295,16 @@ int main(void) {
             case ESTADO_TELA_LOAD:
                 for (int s = 3; s > 0; s--) {
                     desenhar_tela_load(s);
-                    sleep_ms(1000);
+                    buzzer_tocar_nota(440); // Beep curto de contagem regressiva
+                    sleep_ms(100);
+                    buzzer_parar();
+                    sleep_ms(900);
                 }
                 estado_mef = ESTADO_TELA_JOGO;
                 break;
 
             case ESTADO_TELA_JOGO:
-                // Rodada de teste de 4 cordas
-                executar_rodada(0, 4, 8, 12);
-                executar_rodada(8, 0, 4, 0);
+                executar_musica();
 
                 if (pontuacao > recorde) {
                     recorde = pontuacao;
