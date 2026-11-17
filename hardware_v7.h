@@ -43,14 +43,23 @@
 #define LED_RGB_B           12
 
 // ============================================================
-// NOTAS MUSICAIS (Frequências em Hz - 4ª Oitava)
+// NOTAS MUSICAIS (Frequências em Hz - 4ª e 5ª Oitavas)
 // ============================================================
 #define NOTA_DO4            262
 #define NOTA_RE4            294
 #define NOTA_MI4            330
 #define NOTA_FA4            349
+#define NOTA_FAS4           370 // Fá#4 (Dancing With Myself / American Idiot)
 #define NOTA_SOL4           392
+#define NOTA_SOLS4          415 // Sol#4 / Láb4 (Chicleteiro / American Idiot)
 #define NOTA_LA4            440
+#define NOTA_LAS4           466 // Lá#4 / Sib4 (American Idiot)
+#define NOTA_SI4            494
+#define NOTA_DO5            523
+#define NOTA_DOS5           554 // Dó#5 / Réb5 (Ramones / American Idiot)
+#define NOTA_RE5            587
+#define NOTA_RES5           622 // Ré#5 / Mib5 (American Idiot)
+#define NOTA_MI5            659
 
 // ============================================================
 // REGISTRADORES DO TIMER DO RP2040 (BAIXO NÍVEL)

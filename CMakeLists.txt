@@ -56,6 +56,7 @@ target_link_libraries(GuitarDog
     hardware_clocks
     hardware_flash
     hardware_sync
+    hardware_adc
 )
 
 pico_add_extra_outputs(GuitarDog)
